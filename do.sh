@@ -20,7 +20,7 @@ function usage() {
 	echo "L     syntaxnet install|uninstall|build|test : deploy/undeploy/build/test syntaxnet"
 	echo "L     lang install [-l=<lang>]: download a pretrained model (for lang see : https://github.com/tensorflow/models/blob/master/syntaxnet/universal.md)"
 	echo "L     lang test [-l=<lang>] -- <test_text> : test pretrained model with <test_text>"
-	echo "L			train test"
+
 
 }
 
