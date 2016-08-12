@@ -20,7 +20,7 @@ function usage() {
 	echo "L     syntaxnet install|uninstall|build|test : deploy/undeploy/build/test syntaxnet"
 	echo "L     lang install [-l=<lang>]: download a pretrained model (for lang see : https://github.com/tensorflow/models/blob/master/syntaxnet/universal.md)"
 	echo "L     lang test [-l=<lang>] -- <test_text> : test pretrained model with <test_text>"
-
+	echo "L			train test"
 
 }
 
@@ -50,7 +50,44 @@ if [ "$DOMAIN" == "train" ]; then
 
 	mkdir -p "$TRAINED_MODEL_HOME"
 
-	echo "TODO"
+	if [ "$ACTION" == "test" ]; then
+		ID="test"
+		CURRENT_MODEL_HOME="$TRAINED_MODEL_HOME/$ID"
+		mkdir -p "$CURRENT_MODEL_HOME"
+
+		# download data
+		$STELLA_API get_resource "Data" "https://github.com/UniversalDependencies/UD_French" "GIT" "$CURRENT_MODEL_HOME/data"
+
+		# configure data
+		[ ! -f "$CURRENT_MODEL_HOME/context.pbtxt" ] && cp $STELLA_APP_ROOT/pool/context.pbtxt "$CURRENT_MODEL_HOME/"
+		sed -i.bak 's,<your-dataset>/train.conll,'$CURRENT_MODEL_HOME'/data/fr-ud-train.conllu,' "$CURRENT_MODEL_HOME/context.pbtxt"
+		sed -i.bak 's,<your-dataset>/test.conll,'$CURRENT_MODEL_HOME'/data/fr-ud-test.conllu,' "$CURRENT_MODEL_HOME/context.pbtxt"
+		sed -i.bak 's,<your-dataset>/dev.conll,'$CURRENT_MODEL_HOME'/data/fr-ud-dev.conllu,' "$CURRENT_MODEL_HOME/context.pbtxt"
+
+		# launch train
+		set -h
+		source activate $SYNTAXNET_PYTHON_ENV
+		cd "$SYNTAXNET_HOME"
+
+		bazel-bin/syntaxnet/parser_trainer \
+		  --task_context="$CURRENT_MODEL_HOME/context.pbtxt" \
+		  --arg_prefix=brain_pos \
+		  --compute_lexicon \
+		  --graph_builder=greedy \
+		  --training_corpus=training-corpus \
+		  --tuning_corpus=tuning-corpus \
+		  --output_path="$CURRENT_MODEL_HOME/work" \
+		  --batch_size=32 \
+		  --decay_steps=3600 \
+		  --hidden_layer_sizes=128 \
+		  --learning_rate=0.08 \
+		  --momentum=0.9 \
+		  --seed=0 \
+		  --params=128-0.08-3600-0.9-0
+
+		source deactivate $SYNTAXNET_PYTHON_ENV
+		set +h
+	fi
 fi
 
 
