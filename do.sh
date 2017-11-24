@@ -14,6 +14,8 @@ source $_CURRENT_FILE_DIR/stella-link.sh include
 # french treebank 1 https://gforge.inria.fr/projects/fdtb-v1
 # UniversalDependencies french : https://github.com/UniversalDependencies/UD_French
 
+# https://github.com/tensorflow/models/tree/master/research/syntaxnet
+
 function usage() {
 	echo "USAGE :"
 	echo "----------------"
@@ -46,7 +48,7 @@ TRAINED_MODEL_HOME="$STELLA_APP_ROOT/models"
 PRETRAINED_MODEL_HOME="$TRAINED_MODEL_HOME/pretrained"
 
 # --------------- TRAIN ----------------------------
-if [ "$DOMAIN" == "train" ]; then
+if [ "$DOMAIN" = "train" ]; then
 
 	mkdir -p "$TRAINED_MODEL_HOME"
 
@@ -55,11 +57,11 @@ fi
 
 
 # --------------- LANG ----------------------------
-if [ "$DOMAIN" == "lang" ]; then
+if [ "$DOMAIN" = "lang" ]; then
 
 	mkdir -p "$PRETRAINED_MODEL_HOME"
 
-	if [ "$ACTION" == "install" ]; then
+	if [ "$ACTION" = "install" ]; then
 		echo "** Install pre-trained model for $L"
 		$STELLA_API get_resource "Model $L" "http://download.tensorflow.org/models/parsey_universal/$L.zip" "HTTP_ZIP" "$PRETRAINED_MODEL_HOME"
 		if [ ! -d "$PRETRAINED_MODEL_HOME/$L" ]; then
@@ -68,7 +70,7 @@ if [ "$DOMAIN" == "lang" ]; then
 		fi
 	fi
 
-	if [ "$ACTION" == "test" ]; then
+	if [ "$ACTION" = "test" ]; then
 		echo "** Test pre-trained model for $L"
 		if [ ! -d "$PRETRAINED_MODEL_HOME/$L" ]; then
 			echo "** ERROR $L do not exist"
@@ -86,8 +88,8 @@ fi
 
 
 # ------------- SYNTAXNET ----------------------------
-if [ "$DOMAIN" == "syntaxnet" ]; then
-	if [ "$ACTION" == "install" ]; then
+if [ "$DOMAIN" = "syntaxnet" ]; then
+	if [ "$ACTION" = "install" ]; then
 		echo "** Install requirements"
 		$STELLA_API get_features
 
@@ -97,9 +99,11 @@ if [ "$DOMAIN" == "syntaxnet" ]; then
 		set -h
 
 		source activate $SYNTAXNET_PYTHON_ENV
-		pip install -U protobuf==3.0.0b2
+		pip install -U protobuf==3.3.0
 		pip install asciitree
 		pip install numpy
+		pip install mock
+		pip install autograd==1.1.13
 		source deactivate $SYNTAXNET_PYTHON_ENV
 		set +h
 
@@ -109,36 +113,38 @@ if [ "$DOMAIN" == "syntaxnet" ]; then
 		git clone --recursive https://github.com/tensorflow/models.git
 	fi
 
-	if [ "$ACTION" == "build" ]; then
+	if [ "$ACTION" = "build" ]; then
 		echo "** Building syntaxnet"
 		set -h
 		source activate $SYNTAXNET_PYTHON_ENV
 
 		# BUG : switch repo for gmock
+		# TODO : dont need this anymore
 		# https://github.com/tensorflow/models/issues/314
-		sed -i.bak 's,https://archive.openswitch.net/gmock-1.7.0.zip,http://pkgs.fedoraproject.org/repo/pkgs/gmock/gmock-1.7.0.zip/073b984d8798ea1594f5e44d85b20d66/gmock-1.7.0.zip,' "$TENSORFLOW_MODELS_HOME/models/syntaxnet/tensorflow/tensorflow/workspace.bzl"
+		#sed -i.bak 's,https://archive.openswitch.net/gmock-1.7.0.zip,http://pkgs.fedoraproject.org/repo/pkgs/gmock/gmock-1.7.0.zip/073b984d8798ea1594f5e44d85b20d66/gmock-1.7.0.zip,' "$TENSORFLOW_MODELS_HOME/models/syntaxnet/tensorflow/tensorflow/workspace.bzl"
 
 		# BUG : when using swig installed in non standard location
 		# https://github.com/tensorflow/tensorflow/issues/706
 		# https://groups.google.com/forum/#!msg/bazel-discuss/FrHiyndAtik/HAbZBGGXFQ
 		# http://codegists.com/code/install-tensorflow-aws/
 		# patch tensorflow.bzl
-		sed -i.bak 's/ctx.action(executable=ctx.executable.swig_binary,/ctx.action(use_default_shell_env=True,executable=ctx.executable.swig_binary,/' "$TENSORFLOW_MODELS_HOME/models/syntaxnet/tensorflow/tensorflow/tensorflow.bzl"
+		# TODO : original sed expression have to be changed
+		#sed -i.bak 's/ctx.action(executable=ctx.executable.swig_binary,/ctx.action(use_default_shell_env=True,executable=ctx.executable.swig_binary,/' "$TENSORFLOW_MODELS_HOME/models/syntaxnet/tensorflow/tensorflow/tensorflow.bzl"
 
 
 
-		cd "$TENSORFLOW_MODELS_HOME/models/syntaxnet/tensorflow"
+		cd "$TENSORFLOW_MODELS_HOME/models/research/syntaxnet/tensorflow"
 		./configure
 
 		cd ..
 
-		[ "$FORCE" == "1" ] && bazel clean
+		[ "$FORCE" = "1" ] && bazel clean
 
-		[ "$STELLA_CURRENT_PLATFORM" == "linux" ] && bazel test \
+		[ "$STELLA_CURRENT_PLATFORM" = "linux" ] && bazel test \
 																								--sandbox_debug --verbose_failures \
 																								syntaxnet/... util/utf8/...
 
-		[ "$STELLA_CURRENT_PLATFORM" == "darwin" ] && bazel test --linkopt=-headerpad_max_install_names \
+		[ "$STELLA_CURRENT_PLATFORM" = "darwin" ] && bazel test --linkopt=-headerpad_max_install_names \
 																									--sandbox_debug --verbose_failures \
 																									syntaxnet/... util/utf8/...
 
@@ -146,12 +152,12 @@ if [ "$DOMAIN" == "syntaxnet" ]; then
 		set +h
 	fi
 
-	if [ "$ACTION" == "uninstall" ]; then
+	if [ "$ACTION" = "uninstall" ]; then
 		$STELLA_API del_folder "$STELLA_APP_WORK_ROOT"
 		$STELLA_API del_folder "$TENSORFLOW_MODELS_HOME"
 	fi
 
-	if [ "$ACTION" == "test" ]; then
+	if [ "$ACTION" = "test" ]; then
 		set -h
 		source activate $SYNTAXNET_PYTHON_ENV
 		cd "$SYNTAXNET_HOME"
